@@ -3,13 +3,13 @@
   "type": "qml",
   "version": "1.0",
   "description": "Herramienta para selección, conteo y edición masiva de estructuras en una manzana.",
-  "author": "Tu Nombre",
+  "author": "Jhonfred Galarraga",
   "qgisMinimumVersion": "3.16",
   "qgisMaximumVersion": "3.99",
   "homepage": "https://",
   "icon": "icon.svg",
   "files": [
-    "ManzanaTools.qml",
+    "main.qml",
     "ManzanaToolsLogic.js"
   ]
 }
