@@ -1,60 +1,85 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
-import org.qgis 1.0
+import QtQuick.Layouts 1.15
+import qgis.core 1.0
+import qgis.gui 1.0
 
-ToolButton {
-    id: manzanaToolsButton
-    text: "MT"
-    icon.name: "edit-select"
-    checkable: false
-    onClicked: {
-        ManzanaToolsLogic.activateTool()
-    }
+// CAMBIO: Importamos el archivo JS para poder llamarlo
+import "ManzanaToolsLogic.js" as Logic
 
-    Dialog {
-        id: editDialog
-        title: "Edición Masiva"
-        modal: true
-        standardButtons: DialogButtonBox.Cancel
-        visible: false
+// CAMBIO: El archivo debe empezar con un componente "Plugin"
+Plugin {
+    id: root
 
-        Column {
-            spacing: 12
-            padding: 16
+    // CAMBIO: Se define que el plugin agregará un componente a la barra de herramientas
+    PluginComponent {
+        type: "ToolBar"
+        // El botón solo estará activo si la capa "Estructuras Nuevas" es la capa activa
+        enabled: iface.activeLayer !== null && iface.activeLayer.name === "Estructuras Nuevas"
 
-            ComboBox {
-                id: fieldSelector
-                width: parent.width
-                model: []
-                textRole: "display"
-                valueRole: "field"
-                placeholderText: "Selecciona un campo"
-            }
-
-            TextField {
-                id: valueInput
-                width: parent.width
-                placeholderText: "Nuevo valor"
-            }
-
-            Row {
-                spacing: 16
-                Button {
-                    text: "Aplicar"
-                    onClicked: {
-                        ManzanaToolsLogic.applyEdits(fieldSelector.currentValue, valueInput.text)
-                        editDialog.close()
-                    }
-                }
-                Button {
-                    text: "Cancelar"
-                    onClicked: editDialog.close()
-                }
+        ToolButton {
+            id: toolButton
+            icon.source: "qrc:/qgis/images/themes/default/mActionSelect.svg"
+            text: "Manzana"
+            tooltip: "Seleccionar y editar estructuras por manzana"
+            
+            // CAMBIO: Llamamos a la función JS y le pasamos la referencia al diálogo
+            onClicked: {
+                Logic.startSelection(editDialog, fieldSelector, valueInput);
             }
         }
     }
 
-    Component.onCompleted: {
-        ManzanaToolsLogic.init(editDialog, fieldSelector, valueInput)
+    // El diálogo se mantiene, pero ahora está dentro del componente Plugin
+    Dialog {
+        id: editDialog
+        title: "Edición Masiva por Manzana"
+        modal: true
+        width: parent.width * 0.8
+        height: contentLayout.implicitHeight + 40
+        anchors.centerIn: parent
+        standardButtons: Dialog.NoButton
+        visible: false
+
+        ColumnLayout {
+            id: contentLayout
+            width: parent.width
+
+            Label {
+                text: "Elija el campo y el nuevo valor para todos los objetos seleccionados."
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+
+            ComboBox {
+                id: fieldSelector
+                Layout.fillWidth: true
+                model: []
+            }
+
+            TextField {
+                id: valueInput
+                placeholderText: "Escriba el nuevo valor aquí"
+                Layout.fillWidth: true
+            }
+
+            RowLayout {
+                Layout.alignment: Qt.AlignRight
+                
+                Button {
+                    text: "Cancelar"
+                    onClicked: editDialog.close()
+                }
+
+                Button {
+                    text: "Aplicar Cambios"
+                    highlighted: true
+                    onClicked: {
+                        // CAMBIO: Llamamos a la función de aplicar y le pasamos los valores
+                        Logic.applyMassiveEdit(fieldSelector.currentValue, valueInput.text, editDialog);
+                    }
+                }
+            }
+        }
     }
 }
