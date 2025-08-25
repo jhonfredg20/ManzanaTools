@@ -15,7 +15,7 @@ Plugin {
     PluginComponent {
         type: "ToolBar"
         // El botón solo estará activo si la capa "Estructuras Nuevas" es la capa activa
-        enabled: iface.activeLayer !== null && iface.activeLayer.name === "Estructuras Nuevas"
+       enabled: iface.activeLayer !== null && iface.activeLayer.type === VectorLayer
 
         ToolButton {
             id: toolButton
