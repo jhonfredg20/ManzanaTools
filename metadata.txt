@@ -2,4 +2,4 @@
 name=Herramientas de Manzana
 description=Permite contar y editar masivamente atributos de la capa 'Estructuras Nuevas' usando el campo 'Manzana'.
 author=jhonfredg20
-version=1.0.2
+version=1.0.3
