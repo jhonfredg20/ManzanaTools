@@ -1,88 +1,102 @@
-var activeLayer;
-var manzanaID;
-var filterExpression;
-var selectedCount;
-var editDialog;
-var fieldSelector;
-var valueInput;
+// CAMBIO: Se importan las librerías de QGIS
+.import "qgis" as QGis
+.import "qgis.core" as QGisCore
 
-function init(dialogRef, comboRef, textRef) {
-    editDialog = dialogRef;
-    fieldSelector = comboRef;
-    valueInput = textRef;
+// Variable para mantener una referencia a la capa activa durante la operación
+var activeLayer = null;
+
+// Función principal que inicia la herramienta de selección
+function startSelection(dialog, fieldComboBox, valueTextField) {
+    activeLayer = QGis.iface.activeLayer(); // CAMBIO: API correcta para obtener capa activa
+
+    // Validar que la capa es la correcta
+    if (!activeLayer || activeLayer.name !== "Estructuras Nuevas") {
+        QGis.iface.messageBar().pushMessage("Error", "Por favor, selecciona la capa 'Estructuras Nuevas'.", QGis.MessageLevel.Critical, 3);
+        return;
+    }
+
+    // Limpiar el formulario anterior
+    valueTextField.text = "";
+
+    // CAMBIO: Usar PointMapTool es el método moderno y correcto
+    QGis.iface.mapCanvas().setMapTool(QGis.MapTool.PointMapTool, {
+        onPointCaptured: function(point, mouseButton) {
+            // Identificar el objeto en el punto donde se tocó (de forma asíncrona)
+            activeLayer.featureAt(point, {
+                onFinished: function(feature) {
+                    if (!feature.isValid()) {
+                        QGis.iface.messageBar().pushMessage("Info", "No se encontró ninguna estructura en ese punto.", QGis.MessageLevel.Info, 2);
+                        return;
+                    }
+
+                    const manzanaID = feature.attribute("Manzana");
+
+                    if (!manzanaID) {
+                        QGis.iface.messageBar().pushMessage("Advertencia", "La estructura no tiene valor en 'Manzana'.", QGis.MessageLevel.Warning, 3);
+                        return;
+                    }
+
+                    const filterExpression = `"Manzana" = '${manzanaID}'`;
+
+                    activeLayer.selectByExpression(filterExpression);
+                    const selectedCount = activeLayer.selectedFeatureCount();
+
+                    QGis.iface.messageBar().pushMessage("Éxito", `Seleccionadas ${selectedCount} estructuras en Manzana ${manzanaID}.`, QGis.MessageLevel.Success, 4);
+
+                    populateFieldSelector(fieldComboBox, activeLayer);
+                    dialog.open();
+                }
+            });
+
+            // Desactivar la herramienta para no seguir seleccionando
+            QGis.iface.mapCanvas().unsetMapTool();
+        }
+    });
 }
 
-function activateTool() {
-    activeLayer = Qgis.activeLayer();
-    if (!activeLayer) {
-        Qgis.message("No hay una capa activa.", "error");
-        return;
-    }
-    if (activeLayer.name !== "Estructuras Nuevas") {
-        Qgis.message("La capa activa no es 'Estructuras Nuevas'.", "error");
-        return;
-    }
-
-    Qgis.setMapTool("identify");
-    Qgis.message("Toque una estructura para seleccionar la manzana.", "info");
-
-    Qgis.mapClicked.connect(onMapClick);
-}
-
-function onMapClick(identifyResult) {
-    if (!identifyResult || identifyResult.length === 0) {
-        Qgis.message("No se encontró ningún objeto.", "warning");
-        return;
-    }
-
-    var feature = identifyResult[0].feature;
-    manzanaID = feature.attribute("Manzana");
-
-    if (!manzanaID) {
-        Qgis.message("El objeto no tiene valor en el campo 'Manzana'.", "error");
-        return;
-    }
-
-    filterExpression = '"Manzana" = ' + (typeof manzanaID === "string" ? "'" + manzanaID + "'" : manzanaID);
-
-    activeLayer.selectByExpression(filterExpression);
-    selectedCount = activeLayer.selectedFeatureCount();
-
-    Qgis.message("Se seleccionaron " + selectedCount + " estructuras en la Manzana " + manzanaID, "success");
-
-    populateFieldSelector();
-    editDialog.open();
-
-    Qgis.mapClicked.disconnect(onMapClick);
-}
-
-function populateFieldSelector() {
-    var fields = activeLayer.fields();
-    var editableFields = [];
-    for (var i = 0; i < fields.length; i++) {
-        if (activeLayer.isEditable()) {
-            editableFields.push({ "display": fields[i].name, "field": fields[i].name });
+// Función para llenar el selector de campos
+function populateFieldSelector(comboBox, layer) {
+    const fields = layer.fields();
+    var fieldNames = [];
+    // CAMBIO: La forma correcta de iterar sobre los campos
+    for (var i = 0; i < fields.count; ++i) {
+        const field = fields.at(i);
+        // Excluir campos que no son editables
+        if (!field.isReadOnly()) {
+            fieldNames.push(field.name());
         }
     }
-    fieldSelector.model = editableFields;
+    comboBox.model = fieldNames;
 }
 
-function applyEdits(fieldToEdit, newValue) {
-    if (!fieldToEdit || newValue === "") {
-        Qgis.message("Debe seleccionar un campo y asignar un valor.", "error");
+// Función para aplicar la edición masiva
+function applyMassiveEdit(fieldToEdit, newValue, dialog) {
+    if (!activeLayer) return;
+
+    if (!fieldToEdit || newValue.trim() === "") {
+        QGis.iface.messageBar().pushMessage("Error", "Debes seleccionar un campo y proporcionar un valor.", QGis.MessageLevel.Critical, 3);
         return;
     }
 
     activeLayer.startEditing();
 
-    var selectedFeatures = activeLayer.selectedFeatures();
+    const selectedFeatures = activeLayer.selectedFeatures();
     for (var i = 0; i < selectedFeatures.length; i++) {
-        var f = selectedFeatures[i];
-        f.setAttribute(fieldToEdit, newValue);
-        activeLayer.updateFeature(f);
+        let feature = selectedFeatures[i];
+        feature.setAttribute(fieldToEdit, newValue);
+        activeLayer.updateFeature(feature);
     }
 
-    activeLayer.commitChanges();
-
-    Qgis.message("Se actualizaron " + selectedFeatures.length + " registros en el campo " + fieldToEdit, "success");
+    // CAMBIO: Usar callbacks para manejar el resultado de guardar los cambios
+    activeLayer.commitChanges({
+        onSuccess: function() {
+            QGis.iface.messageBar().pushMessage("Éxito", `Se actualizaron ${selectedFeatures.length} estructuras.`, QGis.MessageLevel.Success, 3);
+            activeLayer.removeSelection(); // Limpiar selección
+            dialog.close(); // Cerrar el diálogo solo si fue exitoso
+        },
+        onError: function(error) {
+            QGis.iface.messageBar().pushMessage("Error", `No se pudieron guardar los cambios: ${error}`, QGis.MessageLevel.Critical, 5);
+            activeLayer.rollBack(); // Revertir si hay error
+        }
+    });
 }
