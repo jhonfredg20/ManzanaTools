@@ -13,23 +13,20 @@ Plugin {
 
     // CAMBIO: Se define que el plugin agregará un componente a la barra de herramientas
     PluginComponent {
-        type: "ToolBar"
-        // El botón solo estará activo si la capa "Estructuras Nuevas" es la capa activa
-       enabled: iface.activeLayer !== null && iface.activeLayer.type === VectorLayer
+    type: "ToolBar"
+    // La línea "enabled:" ha sido eliminada. El componente siempre estará activo.
 
-        ToolButton {
-            id: toolButton
-            icon.source: "qrc:/qgis/images/themes/default/mActionSelect.svg"
-            text: "Manzana"
-            tooltip: "Seleccionar y editar estructuras por manzana"
-            
-            // CAMBIO: Llamamos a la función JS y le pasamos la referencia al diálogo
-            onClicked: {
-                Logic.startSelection(editDialog, fieldSelector, valueInput);
-            }
+    ToolButton {
+        id: toolButton
+        icon.source: "qrc:/qgis/images/themes/default/mActionSelect.svg"
+        text: "Manzana"
+        tooltip: "Seleccionar y editar estructuras por manzana"
+
+        onClicked: {
+            Logic.startSelection(editDialog, fieldSelector, valueInput);
         }
     }
-
+}
     // El diálogo se mantiene, pero ahora está dentro del componente Plugin
     Dialog {
         id: editDialog
